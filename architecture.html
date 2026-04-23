@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetroScan AI — System Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070E1C;
+    --panel: #0D1E35;
+    --border: rgba(0,194,224,0.15);
+    --sky: #00C2E0;
+    --saffron: #FF6B00;
+    --green: #00E676;
+    --warn: #FFD600;
+    --fail: #FF1744;
+    --muted: #4A6888;
+    --text: #B8CCD8;
+    --white: #EEF6FF;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .arch-tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--sky);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 20px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+  h1 span { color: var(--saffron); }
+  .sub { color: var(--muted); font-size: 15px; }
+
+  /* THREE LAYERS */
+  .layers {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto 40px;
+  }
+  .layer {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .layer-header {
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .layer.hardware .layer-header { background: rgba(255,107,0,0.1); border-bottom: 1px solid rgba(255,107,0,0.2); }
+  .layer.edge .layer-header { background: rgba(0,194,224,0.08); border-bottom: 1px solid rgba(0,194,224,0.2); }
+  .layer.cloud .layer-header { background: rgba(0,230,118,0.08); border-bottom: 1px solid rgba(0,230,118,0.2); }
+  .layer-icon { font-size: 20px; }
+  .layer-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .layer.hardware .layer-title { color: var(--saffron); }
+  .layer.edge .layer-title { color: var(--sky); }
+  .layer.cloud .layer-title { color: var(--green); }
+  .layer-body { padding: 20px; background: rgba(0,0,0,0.2); }
+
+  .component {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s;
+    position: relative;
+  }
+  .component:hover { transform: translateY(-2px); }
+  .layer.hardware .component:hover { border-color: rgba(255,107,0,0.4); }
+  .layer.edge .component:hover { border-color: rgba(0,194,224,0.4); }
+  .layer.cloud .component:hover { border-color: rgba(0,230,118,0.4); }
+  .comp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .comp-icon { font-size: 16px; }
+  .comp-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--white); }
+  .comp-model { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+  .comp-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .comp-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .ctag {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .layer.hardware .ctag { background: rgba(255,107,0,0.12); color: var(--saffron); border: 1px solid rgba(255,107,0,0.2); }
+  .layer.edge .ctag { background: rgba(0,194,224,0.1); color: var(--sky); border: 1px solid rgba(0,194,224,0.2); }
+  .layer.cloud .ctag { background: rgba(0,230,118,0.1); color: var(--green); border: 1px solid rgba(0,230,118,0.2); }
+
+  /* DATA FLOW */
+  .dataflow {
+    max-width: 1200px;
+    margin: 0 auto 40px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+  .flow-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--sky);
+    margin-bottom: 24px;
+  }
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .flow-step {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+    padding: 16px 8px;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    position: relative;
+  }
+  .flow-step:not(:last-child)::after {
+    content: '→';
+    position: absolute;
+    right: -18px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--sky);
+    font-size: 16px;
+    z-index: 10;
+    font-weight: 700;
+  }
+  .flow-step + .flow-step { margin-left: 28px; }
+  .flow-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .flow-icon { font-size: 22px; margin-bottom: 6px; }
+  .flow-name { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .flow-sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .flow-time {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sky);
+  }
+
+  /* IRC STANDARDS */
+  .standards {
+    max-width: 1200px;
+    margin: 0 auto 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .std-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+  .std-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--sky);
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .std-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .std-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .std-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); }
+  .std-table td:last-child { font-family: var(--mono); color: var(--green); font-weight: 700; }
+  .threshold-viz {
+    margin-top: 12px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .thresh-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .thresh-label { font-size: 11px; color: var(--muted); width: 90px; flex-shrink: 0; }
+  .thresh-bar-track { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 100px; overflow: hidden; }
+  .thresh-bar { height: 100%; border-radius: 100px; }
+  .thresh-val { font-family: var(--mono); font-size: 11px; color: var(--white); width: 40px; text-align: right; }
+
+  /* FOOTER NOTE */
+  .arch-note {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: rgba(255,107,0,0.06);
+    border: 1px solid rgba(255,107,0,0.2);
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .arch-note strong { color: var(--saffron); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="arch-tag">Technical Architecture Document</div>
+  <h1>RETRO<span>SCAN</span> AI</h1>
+  <p class="sub">System Architecture · Data Flow · IRC Standards Integration · Hardware Stack</p>
+</header>
+
+<!-- THREE LAYERS -->
+<div class="layers">
+
+  <!-- HARDWARE -->
+  <div class="layer hardware">
+    <div class="layer-header">
+      <div class="layer-icon">🔧</div>
+      <div class="layer-title">Layer 1 — Hardware</div>
+    </div>
+    <div class="layer-body">
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">💡</span>
+          <span class="comp-name">Pulsed LED Array</span>
+        </div>
+        <div class="comp-model">50W COB LED + Pulse Driver Circuit</div>
+        <div class="comp-desc">Fires precisely timed white light bursts at the road surface. Pulsing at 50 Hz allows frame-differential ambient subtraction.</div>
+        <div class="comp-tags"><span class="ctag">50W COB</span><span class="ctag">50 Hz Pulse</span><span class="ctag">Ambient Subtraction</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">📷</span>
+          <span class="comp-name">Machine Vision Camera</span>
+        </div>
+        <div class="comp-model">Arducam 12MP IMX477 (Sony Sensor)</div>
+        <div class="comp-desc">Fixed at IRC-standard 0.2° observation angle from illumination axis. Global shutter for motion-artifact-free capture at speed.</div>
+        <div class="comp-tags"><span class="ctag">12MP</span><span class="ctag">IRC 0.2° Angle</span><span class="ctag">Global Shutter</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🛰️</span>
+          <span class="comp-name">GPS + IMU Module</span>
+        </div>
+        <div class="comp-model">u-blox NEO-M8N (±2.5m accuracy)</div>
+        <div class="comp-desc">Tags every frame with precise GPS coordinates and timestamp. IMU provides vehicle heading and tilt correction for measurement normalisation.</div>
+        <div class="comp-tags"><span class="ctag">±2.5m</span><span class="ctag">10 Hz Update</span><span class="ctag">IMU Fusion</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🌤️</span>
+          <span class="comp-name">Ambient Light Sensor</span>
+        </div>
+        <div class="comp-model">TSL2591 (0.1–88,000 lux)</div>
+        <div class="comp-desc">Measures ambient illumination continuously. Feeds into AI model as a condition input, enabling the model to switch between day/night/fog processing branches.</div>
+        <div class="comp-tags"><span class="ctag">0.1–88000 lux</span><span class="ctag">16-bit</span><span class="ctag">I²C</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🏗️</span>
+          <span class="comp-name">Mounting Frame</span>
+        </div>
+        <div class="comp-model">Aluminium CNC Channel, Roof-Mounted</div>
+        <div class="comp-desc">Mechanically fixes camera-LED geometry at the IRC observation angle. Rigid mount eliminates reading variance from vehicle vibration.</div>
+        <div class="comp-tags"><span class="ctag">Fixed Angle</span><span class="ctag">Vibration Damped</span><span class="ctag">Any Vehicle</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDGE AI -->
+  <div class="layer edge">
+    <div class="layer-header">
+      <div class="layer-icon">🧠</div>
+      <div class="layer-title">Layer 2 — Edge AI</div>
+    </div>
+    <div class="layer-body">
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">⚡</span>
+          <span class="comp-name">Edge AI Computer</span>
+        </div>
+        <div class="comp-model">NVIDIA Jetson Nano / Raspberry Pi 5</div>
+        <div class="comp-desc">Runs the full inference pipeline at 15 fps. Handles LED pulse synchronisation, frame differencing, model inference, and GPS data fusion simultaneously.</div>
+        <div class="comp-tags"><span class="ctag">15 fps</span><span class="ctag">CUDA Accelerated</span><span class="ctag">TFLite</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🔬</span>
+          <span class="comp-name">Frame Differencing Engine</span>
+        </div>
+        <div class="comp-model">Software module — OpenCV + NumPy</div>
+        <div class="comp-desc">Subtracts LED-off frame from LED-on frame per pixel, isolating only retroreflected light. Result is a clean luminance map of the road surface.</div>
+        <div class="comp-tags"><span class="ctag">OpenCV</span><span class="ctag">Per-pixel Diff</span><span class="ctag">Real-time</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🤖</span>
+          <span class="comp-name">CNN Regression Model</span>
+        </div>
+        <div class="comp-model">MobileNetV2 + Custom Regression Head</div>
+        <div class="comp-desc">Takes the differenced frame + ambient lux + speed + condition flag as input. Outputs estimated RL value (mcd/m²/lux) + confidence interval. INT8 quantised for 4× speed.</div>
+        <div class="comp-tags"><span class="ctag">MobileNetV2</span><span class="ctag">INT8 Quantised</span><span class="ctag">~18ms Inference</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">📋</span>
+          <span class="comp-name">IRC Standards Decision Engine</span>
+        </div>
+        <div class="comp-model">Python Rules Engine + Threshold DB</div>
+        <div class="comp-desc">Compares predicted RL value against IRC 67 (signs) and IRC 35 (markings) thresholds. Classifies each reading as Pass / Warning / Fail. Triggers alerts on Fail events.</div>
+        <div class="comp-tags"><span class="ctag">IRC 67</span><span class="ctag">IRC 35</span><span class="ctag">3-class Output</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🖥️</span>
+          <span class="comp-name">In-Vehicle Dashboard</span>
+        </div>
+        <div class="comp-model">7-inch Touchscreen + Web Dashboard</div>
+        <div class="comp-desc">Displays live GPS heat map, current RL reading, status classification, and session statistics. Driver receives audio alert on Fail events.</div>
+        <div class="comp-tags"><span class="ctag">Live Heat Map</span><span class="ctag">Audio Alerts</span><span class="ctag">Touchscreen</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLOUD -->
+  <div class="layer cloud">
+    <div class="layer-header">
+      <div class="layer-icon">☁️</div>
+      <div class="layer-title">Layer 3 — Cloud</div>
+    </div>
+    <div class="layer-body">
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">📡</span>
+          <span class="comp-name">4G/5G Data Uplink</span>
+        </div>
+        <div class="comp-model">Quectel EC21 LTE Module</div>
+        <div class="comp-desc">Batches GPS-tagged readings every 10 seconds and uploads to cloud. Operates over existing mobile network — no special infrastructure needed on the highway.</div>
+        <div class="comp-tags"><span class="ctag">4G/5G</span><span class="ctag">10s Batch</span><span class="ctag">Compressed</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🗄️</span>
+          <span class="comp-name">Geospatial Data Store</span>
+        </div>
+        <div class="comp-model">PostGIS + TimescaleDB</div>
+        <div class="comp-desc">Stores all readings with full GPS geometry and timestamp. Supports spatial queries — "show all Fail events within 500m of chainage 42+000" — for maintenance planning.</div>
+        <div class="comp-tags"><span class="ctag">PostGIS</span><span class="ctag">Time-series</span><span class="ctag">Spatial Query</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🔍</span>
+          <span class="comp-name">Spatial Clustering Engine</span>
+        </div>
+        <div class="comp-model">DBSCAN Clustering Algorithm</div>
+        <div class="comp-desc">Groups nearby failure readings into maintenance zones. Scores each zone by failure density × road classification × last maintenance date to prioritise work orders.</div>
+        <div class="comp-tags"><span class="ctag">DBSCAN</span><span class="ctag">Priority Scoring</span><span class="ctag">Auto Work Orders</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">📈</span>
+          <span class="comp-name">Predictive Failure Module</span>
+        </div>
+        <div class="comp-model">LSTM Time-series Model</div>
+        <div class="comp-desc">Analyses historical RL trend per GPS zone to predict sign/marking failure 30–60 days in advance. Enables proactive maintenance instead of reactive repair after accidents.</div>
+        <div class="comp-tags"><span class="ctag">LSTM</span><span class="ctag">30-60 Day Forecast</span><span class="ctag">Proactive</span></div>
+      </div>
+      <div class="component">
+        <div class="comp-head">
+          <span class="comp-icon">🌐</span>
+          <span class="comp-name">NHAI Operations Dashboard</span>
+        </div>
+        <div class="comp-model">React + Mapbox GL JS Web App</div>
+        <div class="comp-desc">Full-network heat map visible to all NHAI regional offices. Drill-down to individual readings, maintenance zones, trend charts, and auto-generated work orders for field teams.</div>
+        <div class="comp-tags"><span class="ctag">React</span><span class="ctag">Mapbox</span><span class="ctag">Multi-region</span><span class="ctag">ITMS Integration</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DATA FLOW -->
+<div class="dataflow">
+  <div class="flow-title">End-to-End Data Flow</div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="flow-num">STEP 01</div>
+      <div class="flow-icon">💡</div>
+      <div class="flow-name">LED Pulse</div>
+      <div class="flow-sub">50W COB fires at road surface</div>
+      <div class="flow-time">&lt; 1 ms</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">STEP 02</div>
+      <div class="flow-icon">📷</div>
+      <div class="flow-name">Frame Pair</div>
+      <div class="flow-sub">ON + OFF frame captured</div>
+      <div class="flow-time">&lt; 2 ms</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">STEP 03</div>
+      <div class="flow-icon">🔬</div>
+      <div class="flow-name">Subtraction</div>
+      <div class="flow-sub">Ambient light eliminated</div>
+      <div class="flow-time">&lt; 3 ms</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">STEP 04</div>
+      <div class="flow-icon">🤖</div>
+      <div class="flow-name">AI Inference</div>
+      <div class="flow-sub">CNN predicts RL value</div>
+      <div class="flow-time">~18 ms</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">STEP 05</div>
+      <div class="flow-icon">📋</div>
+      <div class="flow-name">IRC Check</div>
+      <div class="flow-sub">Pass / Warn / Fail</div>
+      <div class="flow-time">&lt; 1 ms</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">STEP 06</div>
+      <div class="flow-icon">🛰️</div>
+      <div class="flow-name">GPS Tag</div>
+      <div class="flow-sub">Coordinate + timestamp</div>
+      <div class="flow-time">&lt; 1 ms</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">STEP 07</div>
+      <div class="flow-icon">☁️</div>
+      <div class="flow-name">Cloud Sync</div>
+      <div class="flow-sub">Upload batch every 10s</div>
+      <div class="flow-time">Async</div>
+    </div>
+  </div>
+</div>
+
+<!-- IRC STANDARDS -->
+<div class="standards">
+  <div class="std-card">
+    <div class="std-title">
+      <span>IRC 67-2012 — Road Sign Retroreflectivity</span>
+    </div>
+    <table class="std-table">
+      <tr><th>Sign Class</th><th>Type</th><th>Min RL (mcd/m²/lux)</th></tr>
+      <tr><td>Class I</td><td>Regulatory / Warning</td><td>70</td></tr>
+      <tr><td>Class II</td><td>High-visibility</td><td>150</td></tr>
+      <tr><td>Class III</td><td>Premium / Expressway</td><td>250</td></tr>
+      <tr><td>Class IIIA</td><td>Super High Intensity</td><td>1000</td></tr>
+    </table>
+    <div class="threshold-viz">
+      <div class="thresh-row">
+        <div class="thresh-label">Class I (70)</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:7%;background:#00E676"></div></div>
+        <div class="thresh-val">70</div>
+      </div>
+      <div class="thresh-row">
+        <div class="thresh-label">Class II (150)</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:15%;background:#00C2E0"></div></div>
+        <div class="thresh-val">150</div>
+      </div>
+      <div class="thresh-row">
+        <div class="thresh-label">Class III (250)</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:25%;background:#FFD600"></div></div>
+        <div class="thresh-val">250</div>
+      </div>
+      <div class="thresh-row">
+        <div class="thresh-label">Class IIIA (1000)</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:100%;background:#FF6B00"></div></div>
+        <div class="thresh-val">1000</div>
+      </div>
+    </div>
+  </div>
+  <div class="std-card">
+    <div class="std-title">
+      <span>IRC 35-2015 — Pavement Marking Retroreflectivity</span>
+    </div>
+    <table class="std-table">
+      <tr><th>Marking Type</th><th>Colour</th><th>Min RL (mcd/m²/lux)</th></tr>
+      <tr><td>Lane Lines</td><td>White</td><td>100</td></tr>
+      <tr><td>Edge Lines</td><td>White</td><td>100</td></tr>
+      <tr><td>Centre Lines</td><td>Yellow</td><td>150</td></tr>
+      <tr><td>Stop Lines</td><td>White</td><td>150</td></tr>
+      <tr><td>Chevrons</td><td>Yellow</td><td>150</td></tr>
+    </table>
+    <div class="threshold-viz">
+      <div class="thresh-row">
+        <div class="thresh-label">White (100)</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:10%;background:#00E676"></div></div>
+        <div class="thresh-val">100</div>
+      </div>
+      <div class="thresh-row">
+        <div class="thresh-label">Yellow (150)</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:15%;background:#FFD600"></div></div>
+        <div class="thresh-val">150</div>
+      </div>
+      <div class="thresh-row">
+        <div class="thresh-label">Warning (120)</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:80%;background:#FF6B00;opacity:0.6"></div></div>
+        <div class="thresh-val">↑20%</div>
+      </div>
+      <div class="thresh-row">
+        <div class="thresh-label">Fail Trigger</div>
+        <div class="thresh-bar-track"><div class="thresh-bar" style="width:100%;background:#FF1744;opacity:0.7"></div></div>
+        <div class="thresh-val">&lt;80%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arch-note">
+  <strong>Calibration Note:</strong> The AI regression model outputs relative luminance that is calibrated against an IRC-compliant reference handheld retroreflectometer during initial setup. A calibration run of 200+ reference readings establishes the transfer function from image luminance to mcd/m²/lux. NHAI can provide their existing handheld device for this one-time calibration, after which the vehicle-mounted system operates autonomously. The calibration is re-checked every 6 months or after any hardware change.
+</div>
+
+</body>
+</html>

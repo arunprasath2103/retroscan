@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetroScan AI — Live Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #070E1C;
+    --panel: #0C1827;
+    --border: rgba(0,194,224,0.12);
+    --sky: #00C2E0;
+    --sky-dim: rgba(0,194,224,0.15);
+    --saffron: #FF6B00;
+    --green: #00E676;
+    --warn: #FFD600;
+    --fail: #FF1744;
+    --muted: #4A6080;
+    --text: #C8D8E8;
+    --white: #F0F8FF;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 56px 1fr;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 24px;
+    position: relative;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--saffron); }
+  .header-sep { width: 1px; height: 28px; background: var(--border); }
+  .status-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--green);
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--green);
+    animation: livepulse 1.5s ease-in-out infinite;
+  }
+  @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+  .header-stats {
+    display: flex;
+    gap: 0;
+    margin-left: auto;
+  }
+  .hstat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    padding: 0 20px;
+    border-left: 1px solid var(--border);
+  }
+  .hstat-val {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.2;
+  }
+  .hstat-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; }
+
+  /* MAIN GRID */
+  main {
+    display: grid;
+    grid-template-columns: 340px 1fr 280px;
+    grid-template-rows: 1fr;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* PANELS */
+  .panel {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-right { border-right: none; border-left: 1px solid var(--border); }
+  .panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--sky);
+  }
+  .panel-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--sky-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    color: var(--sky);
+  }
+  .panel-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* MAP AREA */
+  .map-area {
+    position: relative;
+    overflow: hidden;
+    background: #050d18;
+  }
+  canvas#roadCanvas { position: absolute; inset: 0; }
+
+  /* SPEEDOMETER */
+  .speed-gauge {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    background: rgba(7,14,28,0.9);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 24px;
+    backdrop-filter: blur(10px);
+  }
+  .speed-num {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1;
+  }
+  .speed-unit { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+
+  /* CURRENT RL GAUGE */
+  .rl-gauge {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(7,14,28,0.95);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 32px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    min-width: 220px;
+  }
+  .rl-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .rl-value {
+    font-family: var(--mono);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+  .rl-unit { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .rl-status {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 3px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  /* LOG ITEMS */
+  .log-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+  .log-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+  }
+  .log-dot.pass { background: var(--green); color: var(--green); }
+  .log-dot.warn { background: var(--warn); color: var(--warn); }
+  .log-dot.fail { background: var(--fail); color: var(--fail); }
+  .log-info { flex: 1; }
+  .log-loc { font-family: var(--mono); font-size: 11px; color: var(--sky); }
+  .log-type { font-size: 12px; color: var(--text); margin: 2px 0; }
+  .log-val { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .log-time { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  /* METRICS */
+  .metric-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .metric-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .metric-label { font-size: 11px; color: var(--muted); }
+  .metric-card.pass-m .metric-val { color: var(--green); }
+  .metric-card.warn-m .metric-val { color: var(--warn); }
+  .metric-card.fail-m .metric-val { color: var(--fail); }
+  .metric-card.total-m .metric-val { color: var(--white); }
+
+  /* BAR CHART */
+  .bar-section { margin-bottom: 16px; }
+  .bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .bar-track {
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .bar-fill { height: 100%; border-radius: 100px; transition: width 0.5s ease; }
+
+  /* ALERT */
+  .alert-item {
+    background: rgba(255,23,68,0.08);
+    border: 1px solid rgba(255,23,68,0.25);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    animation: alertPulse 2s ease-in-out infinite;
+  }
+  @keyframes alertPulse { 0%,100%{border-color:rgba(255,23,68,0.25)} 50%{border-color:rgba(255,23,68,0.6)} }
+  .alert-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .alert-title { font-size: 12px; font-weight: 600; color: var(--fail); }
+  .alert-time { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .alert-body { font-size: 11px; color: var(--muted); }
+
+  /* SECTION HEADER IN PANEL */
+  .section-head {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 16px 0 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding-bottom: 6px;
+  }
+
+  /* GPS COORDS */
+  .gps-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  .gps-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--sky);
+    margin-bottom: 4px;
+  }
+  .gps-key { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">RETRO<span>SCAN</span> AI</div>
+  <div class="header-sep"></div>
+  <div class="status-live"><span class="live-dot"></span>LIVE MONITORING</div>
+  <div class="header-sep"></div>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">NH-48 · Bengaluru–Tumkur Corridor</div>
+  <div class="header-stats">
+    <div class="hstat">
+      <div class="hstat-val" id="hDistKm">0.00</div>
+      <div class="hstat-label">km covered</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="hReadings">0</div>
+      <div class="hstat-label">readings</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" style="color:var(--fail)" id="hAlerts">0</div>
+      <div class="hstat-label">alerts</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="hTime">00:00:00</div>
+      <div class="hstat-label">session time</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: LOG -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Reading Log</div>
+      <div class="panel-badge" id="logCount">0 readings</div>
+    </div>
+    <div class="panel-body" id="logPanel"></div>
+  </div>
+
+  <!-- CENTER: MAP -->
+  <div class="map-area">
+    <canvas id="roadCanvas"></canvas>
+    <div class="rl-gauge">
+      <div class="rl-label">Current Retroreflectivity</div>
+      <div class="rl-value" id="rlValue">---</div>
+      <div class="rl-unit">mcd/m²/lux</div>
+      <div class="rl-status" id="rlStatus">SCANNING</div>
+    </div>
+    <div class="speed-gauge">
+      <div class="speed-num" id="speedVal">72</div>
+      <div class="speed-unit">km/h</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: STATS + ALERTS -->
+  <div class="panel panel-right">
+    <div class="panel-header">
+      <div class="panel-title">Analytics</div>
+      <div class="panel-badge">LIVE</div>
+    </div>
+    <div class="panel-body">
+
+      <div class="section-head">Session Metrics</div>
+      <div class="metric-row">
+        <div class="metric-card pass-m">
+          <div class="metric-val" id="mPass">0</div>
+          <div class="metric-label">✓ Pass</div>
+        </div>
+        <div class="metric-card warn-m">
+          <div class="metric-val" id="mWarn">0</div>
+          <div class="metric-label">⚠ Warning</div>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-card fail-m">
+          <div class="metric-val" id="mFail">0</div>
+          <div class="metric-label">✗ Fail</div>
+        </div>
+        <div class="metric-card total-m">
+          <div class="metric-val" id="mAvg">---</div>
+          <div class="metric-label">Avg RL</div>
+        </div>
+      </div>
+
+      <div class="section-head">Distribution</div>
+      <div class="bar-section">
+        <div class="bar-label"><span>Pass</span><span id="pPass">0%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="bPass" style="width:0%;background:var(--green)"></div></div>
+      </div>
+      <div class="bar-section">
+        <div class="bar-label"><span>Warning</span><span id="pWarn">0%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="bWarn" style="width:0%;background:var(--warn)"></div></div>
+      </div>
+      <div class="bar-section">
+        <div class="bar-label"><span>Fail</span><span id="pFail">0%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="bFail" style="width:0%;background:var(--fail)"></div></div>
+      </div>
+
+      <div class="section-head">GPS Position</div>
+      <div class="gps-box">
+        <div class="gps-row"><span class="gps-key">LAT</span><span id="gpsLat">13.0827° N</span></div>
+        <div class="gps-row"><span class="gps-key">LNG</span><span id="gpsLng">77.5946° E</span></div>
+        <div class="gps-row"><span class="gps-key">ALT</span><span>920 m</span></div>
+        <div class="gps-row"><span class="gps-key">FIX</span><span style="color:var(--green)">3D LOCK ±2.5m</span></div>
+      </div>
+
+      <div class="section-head">Active Alerts</div>
+      <div id="alertPanel"><div style="font-size:12px;color:var(--muted);text-align:center;padding:12px">No active alerts</div></div>
+
+      <div class="section-head">AI Model</div>
+      <div class="gps-box">
+        <div class="gps-row"><span class="gps-key">MODEL</span><span>MobileNetV2-RL</span></div>
+        <div class="gps-row"><span class="gps-key">CONDITION</span><span id="conditionVal">DRY/DAY</span></div>
+        <div class="gps-row"><span class="gps-key">CONFIDENCE</span><span id="confVal" style="color:var(--green)">--.--%</span></div>
+        <div class="gps-row"><span class="gps-key">INFERENCE</span><span style="color:var(--sky)">~18 ms</span></div>
+        <div class="gps-row"><span class="gps-key">STANDARD</span><span>IRC 67 / IRC 35</span></div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+const canvas = document.getElementById('roadCanvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// State
+let readings = [];
+let passCount = 0, warnCount = 0, failCount = 0;
+let totalRL = 0;
+let alertCount = 0;
+let sessionSeconds = 0;
+let distKm = 0;
+
+const markingTypes = ['Lane Marking (White)', 'Lane Marking (Yellow)', 'Stop Line', 'Road Sign Type-I', 'Road Sign Type-II', 'Chevron Marking', 'Edge Line'];
+const conditions = ['DRY/DAY', 'DRY/NIGHT', 'WET/DAY', 'WET/NIGHT'];
+
+// Road visualisation
+let roadPoints = [];
+const ROAD_LEN = 120;
+function initRoad() {
+  roadPoints = [];
+  const W = canvas.width, H = canvas.height;
+  for (let i = 0; i < ROAD_LEN; i++) {
+    roadPoints.push({
+      x: W / 2 + Math.sin(i * 0.05) * (W * 0.2),
+      y: H - (i / ROAD_LEN) * H * 1.2,
+      rl: null,
+      status: null
+    });
+  }
+}
+
+let carY = 0;
+let frameIdx = 0;
+
+function drawRoad() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background grid
+  ctx.strokeStyle = 'rgba(0,194,224,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  if (roadPoints.length < 2) return;
+
+  const carPt = roadPoints[Math.min(Math.floor(carY), roadPoints.length - 2)];
+
+  // Draw road base
+  ctx.beginPath();
+  ctx.lineWidth = 56;
+  ctx.strokeStyle = '#1A2840';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  roadPoints.forEach((pt, i) => {
+    if (i === 0) ctx.moveTo(pt.x, pt.y + H * 0.5);
+    else ctx.lineTo(pt.x, pt.y + H * 0.5);
+  });
+  ctx.stroke();
+
+  // Draw RL overlay segments
+  for (let i = 1; i < roadPoints.length; i++) {
+    const pt = roadPoints[i];
+    const prev = roadPoints[i - 1];
+    if (!pt.status) continue;
+    const col = pt.status === 'pass' ? '#00E676' : pt.status === 'warn' ? '#FFD600' : '#FF1744';
+    ctx.beginPath();
+    ctx.lineWidth = 50;
+    ctx.strokeStyle = col + '30';
+    ctx.moveTo(prev.x, prev.y + H * 0.5);
+    ctx.lineTo(pt.x, pt.y + H * 0.5);
+    ctx.stroke();
+
+    // Dot
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y + H * 0.5, 4, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+  }
+
+  // Road edge lines
+  ctx.beginPath();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.setLineDash([]);
+  roadPoints.forEach((pt, i) => {
+    const off = 24;
+    if (i === 0) ctx.moveTo(pt.x - off, pt.y + H * 0.5);
+    else ctx.lineTo(pt.x - off, pt.y + H * 0.5);
+  });
+  ctx.stroke();
+  ctx.beginPath();
+  roadPoints.forEach((pt, i) => {
+    const off = 24;
+    if (i === 0) ctx.moveTo(pt.x + off, pt.y + H * 0.5);
+    else ctx.lineTo(pt.x + off, pt.y + H * 0.5);
+  });
+  ctx.stroke();
+
+  // Center dashes
+  ctx.setLineDash([12, 14]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  roadPoints.forEach((pt, i) => {
+    if (i === 0) ctx.moveTo(pt.x, pt.y + H * 0.5);
+    else ctx.lineTo(pt.x, pt.y + H * 0.5);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Vehicle
+  const vx = carPt.x, vy = carPt.y + H * 0.5;
+
+  // Headlight glow
+  const gl = ctx.createRadialGradient(vx, vy, 0, vx, vy, 80);
+  gl.addColorStop(0, 'rgba(255,200,100,0.15)');
+  gl.addColorStop(1, 'transparent');
+  ctx.beginPath();
+  ctx.arc(vx, vy, 80, 0, Math.PI * 2);
+  ctx.fillStyle = gl;
+  ctx.fill();
+
+  // LED pulse
+  if (frameIdx % 20 < 10) {
+    const ledGl = ctx.createRadialGradient(vx, vy + 30, 0, vx, vy + 30, 40);
+    ledGl.addColorStop(0, 'rgba(0,194,224,0.4)');
+    ledGl.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(vx, vy + 30, 40, 0, Math.PI * 2);
+    ctx.fillStyle = ledGl;
+    ctx.fill();
+  }
+
+  // Car body
+  ctx.fillStyle = '#1A3060';
+  ctx.beginPath();
+  ctx.roundRect(vx - 14, vy - 22, 28, 44, 6);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,194,224,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Headlights
+  ctx.fillStyle = '#FFD080';
+  ctx.beginPath(); ctx.arc(vx - 8, vy - 20, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(vx + 8, vy - 20, 3, 0, Math.PI * 2); ctx.fill();
+
+  // Camera indicator
+  ctx.fillStyle = 'rgba(255,107,0,0.9)';
+  ctx.beginPath();
+  ctx.arc(vx, vy - 26, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sensor beam
+  if (frameIdx % 20 < 10) {
+    ctx.strokeStyle = 'rgba(0,194,224,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(vx, vy + 22);
+    ctx.lineTo(vx - 15, vy + 70);
+    ctx.moveTo(vx, vy + 22);
+    ctx.lineTo(vx + 15, vy + 70);
+    ctx.stroke();
+  }
+}
+
+function animate() {
+  frameIdx++;
+  carY = (frameIdx * 0.15) % (roadPoints.length - 2);
+
+  // Shift road
+  if (frameIdx % 6 === 0) {
+    const W = canvas.width, H = canvas.height;
+    roadPoints.shift();
+    const last = roadPoints[roadPoints.length - 1];
+    roadPoints.push({
+      x: W / 2 + Math.sin((frameIdx * 0.8) * 0.05) * (W * 0.2),
+      y: last.y - H / ROAD_LEN,
+      rl: null,
+      status: null
+    });
+    // Re-normalise y
+    const minY = Math.min(...roadPoints.map(p => p.y));
+    roadPoints.forEach(p => p.y -= minY - (-H * 0.2));
+  }
+
+  drawRoad();
+  requestAnimationFrame(animate);
+}
+
+initRoad();
+animate();
+
+// Reading generator
+function generateReading() {
+  const type = markingTypes[Math.floor(Math.random() * markingTypes.length)];
+  const isSign = type.includes('Road Sign');
+  const isYellow = type.includes('Yellow');
+
+  let threshold = isSign ? (Math.random() < 0.5 ? 70 : 150) : (isYellow ? 150 : 100);
+  // Generate RL with realistic distribution
+  const base = threshold * (0.5 + Math.random() * 1.2);
+  const rl = Math.round(Math.max(30, base));
+
+  let status = rl >= threshold ? 'pass' : rl >= threshold * 0.8 ? 'warn' : 'fail';
+  // Ensure some failures for demo
+  if (Math.random() < 0.12) { status = 'fail'; }
+  if (Math.random() < 0.18) { status = 'warn'; }
+
+  const lat = (13.0827 + (Math.random() - 0.5) * 0.1).toFixed(4);
+  const lng = (77.5946 + (Math.random() - 0.5) * 0.1).toFixed(4);
+  const cond = conditions[Math.floor(Math.random() * conditions.length)];
+  const conf = (88 + Math.random() * 10).toFixed(1);
+
+  return { type, rl, status, threshold, lat, lng, cond, conf };
+}
+
+function addReading(r) {
+  readings.unshift(r);
+  if (readings.length > 200) readings.pop();
+
+  // Counters
+  if (r.status === 'pass') passCount++;
+  else if (r.status === 'warn') warnCount++;
+  else { failCount++; alertCount++; }
+  totalRL += r.rl;
+
+  const total = passCount + warnCount + failCount;
+
+  // Update RL display
+  const rlEl = document.getElementById('rlValue');
+  const rlStatus = document.getElementById('rlStatus');
+  rlEl.textContent = r.rl;
+  const colors = { pass: '#00E676', warn: '#FFD600', fail: '#FF1744' };
+  const labels = { pass: '✓ PASS', warn: '⚠ WARNING', fail: '✗ FAIL' };
+  rlEl.style.color = colors[r.status];
+  rlStatus.textContent = labels[r.status];
+  rlStatus.style.background = colors[r.status] + '20';
+  rlStatus.style.color = colors[r.status];
+  rlStatus.style.border = '1px solid ' + colors[r.status] + '40';
+
+  // Header stats
+  distKm += 0.08 + Math.random() * 0.04;
+  document.getElementById('hDistKm').textContent = distKm.toFixed(2);
+  document.getElementById('hReadings').textContent = total;
+  document.getElementById('hAlerts').textContent = alertCount;
+
+  // GPS
+  document.getElementById('gpsLat').textContent = r.lat + '° N';
+  document.getElementById('gpsLng').textContent = r.lng + '° E';
+  document.getElementById('conditionVal').textContent = r.cond;
+  document.getElementById('confVal').textContent = r.conf + '%';
+  document.getElementById('speedVal').textContent = Math.floor(60 + Math.random() * 40);
+
+  // Metrics
+  document.getElementById('mPass').textContent = passCount;
+  document.getElementById('mWarn').textContent = warnCount;
+  document.getElementById('mFail').textContent = failCount;
+  document.getElementById('mAvg').textContent = Math.round(totalRL / total);
+
+  // Bars
+  const pp = ((passCount / total) * 100).toFixed(0);
+  const pw = ((warnCount / total) * 100).toFixed(0);
+  const pf = ((failCount / total) * 100).toFixed(0);
+  document.getElementById('bPass').style.width = pp + '%';
+  document.getElementById('bWarn').style.width = pw + '%';
+  document.getElementById('bFail').style.width = pf + '%';
+  document.getElementById('pPass').textContent = pp + '%';
+  document.getElementById('pWarn').textContent = pw + '%';
+  document.getElementById('pFail').textContent = pf + '%';
+
+  // Log count
+  document.getElementById('logCount').textContent = total + ' readings';
+
+  // Add to log
+  const logPanel = document.getElementById('logPanel');
+  const now = new Date();
+  const timeStr = now.toTimeString().slice(0, 8);
+  const li = document.createElement('div');
+  li.className = 'log-item';
+  li.innerHTML = `
+    <div class="log-dot ${r.status}"></div>
+    <div class="log-info">
+      <div class="log-loc">${r.lat}°N, ${r.lng}°E</div>
+      <div class="log-type">${r.type}</div>
+      <div class="log-val">${r.rl} mcd/m²/lux · Threshold: ${r.threshold} · ${r.cond}</div>
+    </div>
+    <div class="log-time">${timeStr}</div>
+  `;
+  logPanel.insertBefore(li, logPanel.firstChild);
+  if (logPanel.children.length > 60) logPanel.removeChild(logPanel.lastChild);
+
+  // Alerts for failures
+  if (r.status === 'fail') {
+    const alertPanel = document.getElementById('alertPanel');
+    if (alertPanel.querySelector('.no-alerts')) alertPanel.innerHTML = '';
+    const alert = document.createElement('div');
+    alert.className = 'alert-item';
+    alert.innerHTML = `
+      <div class="alert-head">
+        <div class="alert-title">⚠ RETROREFLECTIVITY FAILURE</div>
+        <div class="alert-time">${timeStr}</div>
+      </div>
+      <div class="alert-body">${r.type} · ${r.rl} mcd/m²/lux (min. ${r.threshold}) · Km ${distKm.toFixed(1)}</div>
+    `;
+    alertPanel.insertBefore(alert, alertPanel.firstChild);
+    if (alertPanel.children.length > 5) alertPanel.removeChild(alertPanel.lastChild);
+  }
+
+  // Road point colour
+  const pt = roadPoints[Math.floor(roadPoints.length * 0.3)];
+  if (pt) { pt.rl = r.rl; pt.status = r.status; }
+}
+
+// Session timer
+setInterval(() => {
+  sessionSeconds++;
+  const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
+  const s = String(sessionSeconds % 60).padStart(2, '0');
+  document.getElementById('hTime').textContent = `${h}:${m}:${s}`;
+}, 1000);
+
+// Reading interval
+setInterval(() => addReading(generateReading()), 1200);
+setTimeout(() => { for (let i = 0; i < 8; i++) setTimeout(() => addReading(generateReading()), i * 100); }, 500);
+</script>
+</body>
+</html>
